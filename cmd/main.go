@@ -55,7 +55,6 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 		log.Fatalf("[%s] failed to get current block number", chain)
 	}
 	currentBlock := int64(currentBlockUint)
-	log.Printf("[%s] Got current block", chain)
 
 	// Balancer factory genesis
 	fromBlock := enums.DexFactGenesis[chain]
