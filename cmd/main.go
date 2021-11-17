@@ -44,7 +44,7 @@ func main() {
 
 func getCreatedPool(ctx context.Context, param dexParam) {
 	chain := param.chain
-	nodeAddr := enums.DexNodeMap[chain]
+	nodeAddr := enums.DexNode[chain]
 	client, err := ethclient.Dial(string(nodeAddr))
 	if err != nil {
 		log.Fatalf("[%s] failed to init client", chain)
