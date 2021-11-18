@@ -9,10 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/artworkk/balancer-factory-logs/contract"
+	factoryContract "github.com/artworkk/balancer-factory-logs/contracts-go/balancer/factory"
+	vaultContract "github.com/artworkk/balancer-factory-logs/contracts-go/balancer/thevault"
+	poolContract "github.com/artworkk/balancer-factory-logs/contracts-go/balancer/weightedpool"
 	"github.com/artworkk/balancer-factory-logs/enums"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -61,11 +64,15 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 	// Balancer factory addr
 	factoryAddress := enums.DexFactAddr[chain]
 	// Balancer factory ABI
-	balAbi, err := abi.JSON(strings.NewReader(contract.ContractABI))
+	balancerFactoryAbi, err := abi.JSON(strings.NewReader(factoryContract.ContractABI))
 	if err != nil {
 		log.Fatalf("[%s] failed to parse balancer abi", chain)
 	}
-	eventPoolCreated := balAbi.Events["PoolCreated"].ID
+	eventPoolCreated := balancerFactoryAbi.Events["PoolCreated"].ID
+	// balancerWeightedPoolAbi, err := abi.JSON(strings.NewReader(weightedpool.ContractABI))
+	// if err != nil {
+	// 	log.Fatalf("[%s] failed to parse balancer abi", chain)
+	// }
 
 	var wg sync.WaitGroup
 	step := int64(1024)
@@ -101,9 +108,40 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 				}()
 				switch l.Topics[0] {
 				case eventPoolCreated:
-					lpAddress := l.Topics[1]
+					lpAddress := common.HexToAddress(l.Topics[1].String())
 					fmt.Printf("[%s] Found PoolCreated on block %d at address %s\n",
-						chain, l.BlockNumber, lpAddress.String())
+						chain, l.BlockNumber, lpAddress)
+					poolCaller, err := poolContract.NewContract(lpAddress, client)
+					if err != nil {
+						log.Fatalf("[%s] failed to create poolCaller for pool %v\n%v\n", chain, lpAddress, err.Error())
+					}
+					callOpts := &bind.CallOpts{
+						BlockNumber: big.NewInt(currentBlock),
+						Context:     ctx,
+					}
+					poolId, err := poolCaller.GetPoolId(callOpts)
+					if err != nil {
+						log.Fatalf("[%s] failed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
+					}
+					vaultCaller, err := vaultContract.NewThevaultCaller(lpAddress, client)
+					if err != nil {
+						log.Fatalf("[%s] failed to create vaultCaller for pool %v\n%s\n", chain, lpAddress, err.Error())
+					}
+					poolTokens, err := vaultCaller.GetPoolTokens(callOpts, poolId)
+					if err != nil {
+						log.Fatalf("[%s] failed to get pool tokens for pool %v\n%v\n", chain, lpAddress, err.Error())
+					}
+					fmt.Println("Pool tokens are", poolTokens)
+					weights, err := poolCaller.GetNormalizedWeights(callOpts)
+					if err != nil {
+						log.Fatalf("[%s] failed to get pool %v weights\n", chain, lpAddress)
+					}
+					fmt.Printf("[%s] Pool %v weight is: %+v\n", chain, lpAddress, weights)
+					swapFeePerc, err := poolCaller.GetSwapFeePercentage(callOpts)
+					if err != nil {
+						log.Fatalf("[%s] failed to get pool %v swap fee percentage\n", chain, lpAddress)
+					}
+					fmt.Printf("[%s] Pool %v swap fee is: %v\n", chain, lpAddress, swapFeePerc)
 				}
 			}(_log)
 			wg.Wait()
