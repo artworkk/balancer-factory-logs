@@ -64,15 +64,11 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 	// Balancer factory addr
 	factoryAddress := enums.DexFactAddr[chain]
 	// Balancer factory ABI
-	balancerFactoryAbi, err := abi.JSON(strings.NewReader(factoryContract.ContractABI))
+	balancerFactoryAbi, err := abi.JSON(strings.NewReader(factoryContract.FactoryABI))
 	if err != nil {
 		log.Fatalf("[%s] failed to parse balancer abi", chain)
 	}
 	eventPoolCreated := balancerFactoryAbi.Events["PoolCreated"].ID
-	// balancerWeightedPoolAbi, err := abi.JSON(strings.NewReader(weightedpool.ContractABI))
-	// if err != nil {
-	// 	log.Fatalf("[%s] failed to parse balancer abi", chain)
-	// }
 
 	var wg sync.WaitGroup
 	step := int64(1024)
@@ -123,10 +119,21 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 					if err != nil {
 						log.Fatalf("[%s] failed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
 					}
-					vaultCaller, err := vaultContract.NewThevaultCaller(lpAddress, client)
+					fmt.Printf("%x\n", poolId)
+					vaultCaller, err := vaultContract.NewThevault(lpAddress, client)
 					if err != nil {
 						log.Fatalf("[%s] failed to create vaultCaller for pool %v\n%s\n", chain, lpAddress, err.Error())
 					}
+					paused, err := vaultCaller.GetPausedState(callOpts)
+					if err != nil {
+						log.Fatalln("Failed to get the vault paused state")
+					}
+					fmt.Println(paused)
+					pool, _, err := vaultCaller.GetPool(callOpts, poolId)
+					if err != nil {
+						log.Fatalln("failed to get pool")
+					}
+					fmt.Printf("%v\n", pool)
 					poolTokens, err := vaultCaller.GetPoolTokens(callOpts, poolId)
 					if err != nil {
 						log.Fatalf("[%s] failed to get pool tokens for pool %v\n%v\n", chain, lpAddress, err.Error())
