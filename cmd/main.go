@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -25,6 +26,21 @@ type dexParam struct {
 	chain enums.ChainType
 }
 
+type poolData struct {
+	PoolId    string         `json:"poolId"`
+	LpAddress common.Address `json:"lpAddress"`
+	// Token0       common.Address `json:"token0"`
+	// Token1       common.Address `json:"token1"`
+	WeightToken0 *big.Int `json:"weightToken0"`
+	WeightToken1 *big.Int `json:"weightToken1"`
+	SwapFeePerc  *big.Int `json:"swapFeePercentage"`
+	IsPaused     bool     `json:"isPaused"`
+}
+
+var (
+	pools = make(chan poolData)
+)
+
 func main() {
 	ctx := context.Background()
 	params := []dexParam{
@@ -41,6 +57,15 @@ func main() {
 			getCreatedPool(c, p)
 		}(ctx, param)
 	}
+	go func() {
+		for {
+			select {
+			case newPool := <-pools:
+				_json, _ := json.Marshal(newPool)
+				fmt.Println(string(_json))
+			}
+		}
+	}()
 	time.Sleep(5 * time.Millisecond)
 	wg.Wait()
 }
@@ -104,12 +129,13 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 				}()
 				switch l.Topics[0] {
 				case eventPoolCreated:
-					lpAddress := common.HexToAddress(l.Topics[1].String())
+					var newPool poolData
+					newPool.LpAddress = common.HexToAddress(l.Topics[1].String())
 					fmt.Printf("[%s] Found PoolCreated on block %d at address %s\n",
-						chain, l.BlockNumber, lpAddress)
-					poolCaller, err := poolContract.NewContract(lpAddress, client)
+						chain, l.BlockNumber, newPool.LpAddress)
+					poolCaller, err := poolContract.NewContract(newPool.LpAddress, client)
 					if err != nil {
-						log.Fatalf("[%s] failed to create poolCaller for pool %v\n%v\n", chain, lpAddress, err.Error())
+						log.Fatalf("[%s] failed to create poolCaller for pool %v\n%v\n", chain, newPool.LpAddress, err.Error())
 					}
 					callOpts := &bind.CallOpts{
 						BlockNumber: big.NewInt(currentBlock),
@@ -117,38 +143,39 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 					}
 					poolId, err := poolCaller.GetPoolId(callOpts)
 					if err != nil {
-						log.Fatalf("[%s] failed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
+						log.Fatalf("[%s] failed to get pool ID from LP address %v weights\n%v\n", chain, newPool.LpAddress, err.Error())
 					}
-					fmt.Printf("%x\n", poolId)
-					vaultCaller, err := vaultContract.NewThevault(lpAddress, client)
+					newPool.PoolId = fmt.Sprintf("%x", poolId)
+					vaultCaller, err := vaultContract.NewThevault(newPool.LpAddress, client)
 					if err != nil {
-						log.Fatalf("[%s] failed to create vaultCaller for pool %v\n%s\n", chain, lpAddress, err.Error())
+						log.Fatalf("[%s] failed to create vaultCaller for pool %v\n%s\n", chain, newPool.LpAddress, err.Error())
 					}
 					paused, err := vaultCaller.GetPausedState(callOpts)
 					if err != nil {
 						log.Fatalln("Failed to get the vault paused state")
 					}
-					fmt.Println(paused)
-					pool, _, err := vaultCaller.GetPool(callOpts, poolId)
-					if err != nil {
-						log.Fatalln("failed to get pool")
-					}
-					fmt.Printf("%v\n", pool)
-					poolTokens, err := vaultCaller.GetPoolTokens(callOpts, poolId)
-					if err != nil {
-						log.Fatalf("[%s] failed to get pool tokens for pool %v\n%v\n", chain, lpAddress, err.Error())
-					}
-					fmt.Println("Pool tokens are", poolTokens)
+					newPool.IsPaused = paused.Paused
+					// _, _, err = vaultCaller.GetPool(callOpts, poolId)
+					// if err != nil {
+					// 	log.Fatalln("failed to get pool")
+					// }
+					// poolTokens, err := vaultCaller.GetPoolTokens(callOpts, poolId)
+					// if err != nil {
+					// 	log.Fatalf("[%s] failed to get pool tokens for pool %v\n%v\n", chain, newPool.LpAddress, err.Error())
+					// }
+					// newPool.Token0 = poolTokens.Tokens[0]
+					// newPool.Token1 = poolTokens.Tokens[1]
 					weights, err := poolCaller.GetNormalizedWeights(callOpts)
 					if err != nil {
-						log.Fatalf("[%s] failed to get pool %v weights\n", chain, lpAddress)
+						log.Fatalf("[%s] failed to get pool %v weights\n", chain, newPool.LpAddress)
 					}
-					fmt.Printf("[%s] Pool %v weight is: %+v\n", chain, lpAddress, weights)
-					swapFeePerc, err := poolCaller.GetSwapFeePercentage(callOpts)
+					newPool.WeightToken0 = weights[0]
+					newPool.WeightToken0 = weights[1]
+					newPool.SwapFeePerc, err = poolCaller.GetSwapFeePercentage(callOpts)
 					if err != nil {
-						log.Fatalf("[%s] failed to get pool %v swap fee percentage\n", chain, lpAddress)
+						log.Fatalf("[%s] failed to get pool %v swap fee percentage\n", chain, newPool.LpAddress)
 					}
-					fmt.Printf("[%s] Pool %v swap fee is: %v\n", chain, lpAddress, swapFeePerc)
+					pools <- newPool
 				}
 			}(_log)
 			wg.Wait()
