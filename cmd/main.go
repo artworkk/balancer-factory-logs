@@ -27,8 +27,10 @@ type dexParam struct {
 }
 
 type poolData struct {
-	PoolId    string         `json:"poolId"`
-	LpAddress common.Address `json:"lpAddress"`
+	PoolId    string          `json:"poolId"`
+	LpAddress common.Address  `json:"lpAddress"`
+	Chain     enums.ChainType `json:"chain"`
+	// GetPoolTokens(poolId) doesn't work yet
 	// Token0       common.Address `json:"token0"`
 	// Token1       common.Address `json:"token1"`
 	WeightToken0 *big.Int `json:"weightToken0"`
@@ -130,6 +132,7 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 				switch l.Topics[0] {
 				case eventPoolCreated:
 					var newPool poolData
+					newPool.Chain = chain
 					newPool.LpAddress = common.HexToAddress(l.Topics[1].String())
 					fmt.Printf("[%s] Found PoolCreated on block %d at address %s\n",
 						chain, l.BlockNumber, newPool.LpAddress)
