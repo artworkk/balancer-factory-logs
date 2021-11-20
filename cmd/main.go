@@ -22,7 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-type dexParam struct {
+type param struct {
 	chain enums.ChainType
 }
 
@@ -45,19 +45,19 @@ var (
 
 func main() {
 	ctx := context.Background()
-	params := []dexParam{
+	params := []param{
 		{chain: enums.Ethereum},
 		{chain: enums.Polygon},
 	}
 	var wg sync.WaitGroup
-	for _, param := range params {
-		go func(c context.Context, p dexParam) {
+	for _, _param := range params {
+		go func(c context.Context, p param) {
 			defer func() {
 				wg.Done()
 			}()
 			wg.Add(1)
 			getCreatedPool(c, p)
-		}(ctx, param)
+		}(ctx, _param)
 	}
 	go func() {
 		for newPool := range pools {
@@ -69,7 +69,7 @@ func main() {
 	wg.Wait()
 }
 
-func getCreatedPool(ctx context.Context, param dexParam) {
+func getCreatedPool(ctx context.Context, param param) {
 	chain := param.chain
 	nodeAddr := enums.DexNode[chain]
 	client, err := ethclient.Dial(string(nodeAddr))
