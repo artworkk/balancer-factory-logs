@@ -132,13 +132,14 @@ func getCreatedPool(ctx context.Context, param param) {
 					lpAddress := common.HexToAddress(l.Topics[1].String())
 					log.Printf("[%s]\tFound PoolCreated on block %d at address %s\n",
 						chain, l.BlockNumber, lpAddress)
-					poolCaller, err := poolContract.NewContract(lpAddress, client)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to create poolCaller for pool %v\n%v\n", chain, lpAddress, err.Error())
-					}
+
 					callOpts := &bind.CallOpts{
 						BlockNumber: big.NewInt(currentBlock),
 						Context:     ctx,
+					}
+					poolCaller, err := poolContract.NewContract(lpAddress, client)
+					if err != nil {
+						log.Fatalf("[%s]\tfailed to create poolCaller for pool %v\n%v\n", chain, lpAddress, err.Error())
 					}
 					poolId, err := poolCaller.GetPoolId(callOpts)
 					if err != nil {
