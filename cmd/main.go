@@ -137,7 +137,7 @@ func getCreatedPool(ctx context.Context, param param) {
 						BlockNumber: big.NewInt(currentBlock),
 						Context:     ctx,
 					}
-					poolCaller, err := poolContract.NewContract(lpAddress, client)
+					poolCaller, err := poolContract.NewWeightedpool(lpAddress, client)
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to create poolCaller for pool %v\n%v\n", chain, lpAddress, err.Error())
 					}
@@ -145,7 +145,7 @@ func getCreatedPool(ctx context.Context, param param) {
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
 					}
-					vaultCaller, err := vaultContract.NewThevaultCaller(lpAddress, client)
+					vaultCaller, err := vaultContract.NewThevault(lpAddress, client)
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to create vaultCaller for pool %v\n%s\n", chain, lpAddress, err.Error())
 					}
