@@ -84,7 +84,7 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 	currentBlock := int64(currentBlockUint)
 
 	// Balancer factory genesis
-	// fromBlock := enums.DexFactGenesis[chain]
+	fromBlock := enums.DexFactGenesis[chain]
 	// Balancer factory addr
 	factoryAddress := enums.DexFactAddr[chain]
 	// Balancer factory ABI
@@ -99,7 +99,7 @@ func getCreatedPool(ctx context.Context, param dexParam) {
 	guard := make(chan struct{}, step)
 
 	log.Printf("[%s] Filtering logs..", chain)
-	for from := currentBlock - 50000; from < currentBlock; from += step {
+	for from := fromBlock; from < currentBlock; from += step {
 		to := from + step + 1
 		if to > currentBlock {
 			to = currentBlock
