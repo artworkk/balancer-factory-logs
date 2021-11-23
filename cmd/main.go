@@ -10,9 +10,7 @@ import (
 	"sync"
 	"time"
 
-	factoryContract "github.com/artworkk/balancer-factory-logs/contracts-go/balancer/factory"
-	vaultContract "github.com/artworkk/balancer-factory-logs/contracts-go/balancer/thevault"
-	poolContract "github.com/artworkk/balancer-factory-logs/contracts-go/balancer/weightedpool"
+	"github.com/artworkk/balancer-factory-logs/contract"
 	"github.com/artworkk/balancer-factory-logs/enums"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -27,15 +25,17 @@ type param struct {
 }
 
 type poolData struct {
-	PoolId       string          `json:"poolId"`
-	LpAddress    common.Address  `json:"lpAddress"`
-	Chain        enums.ChainType `json:"chain"`
-	Token0       common.Address  `json:"token0"`
-	Token1       common.Address  `json:"token1"`
-	WeightToken0 *big.Int        `json:"weightToken0"`
-	WeightToken1 *big.Int        `json:"weightToken1"`
-	SwapFeePerc  *big.Int        `json:"swapFeePercentage"`
-	IsPaused     bool            `json:"isPaused"`
+	PoolId        string          `json:"poolId"`
+	LpAddress     common.Address  `json:"lpAddress"`
+	Chain         enums.ChainType `json:"chain"`
+	Token0        common.Address  `json:"token0"`
+	Token1        common.Address  `json:"token1"`
+	BalanceToken0 *big.Int        `json:"balanceToken0"`
+	BalanceToken1 *big.Int        `json:"balanceToken1"`
+	WeightToken0  *big.Int        `json:"weightToken0"`
+	WeightToken1  *big.Int        `json:"weightToken1"`
+	SwapFeePerc   *big.Int        `json:"swapFeePercentage"`
+	IsPaused      bool            `json:"isPaused"`
 }
 
 var (
@@ -87,7 +87,7 @@ func getCreatedPool(ctx context.Context, param param) {
 	// Balancer factory addr
 	factoryAddress := enums.DexFactAddr[chain]
 	// Balancer factory ABI
-	balancerFactoryAbi, err := abi.JSON(strings.NewReader(factoryContract.FactoryABI))
+	balancerFactoryAbi, err := abi.JSON(strings.NewReader(contract.Balancerv2wp2tokenfactoryABI))
 	if err != nil {
 		log.Fatalf("[%s]\tfailed to parse balancer abi", chain)
 	}
@@ -136,15 +136,15 @@ func getCreatedPool(ctx context.Context, param param) {
 						BlockNumber: big.NewInt(currentBlock),
 						Context:     ctx,
 					}
-					balancerV2WeightedPool, err := poolContract.NewWeightedpool(lpAddress, client)
+					balancerV2Wp2Token, err := contract.NewBalancerv2wp2token(lpAddress, client)
 					if err != nil {
-						log.Fatalf("[%s]\tfailed to create balancerV2WeightedPool for pool %v\n%v\n", chain, lpAddress, err.Error())
+						log.Fatalf("[%s]\tfailed to create balancerV2Wp2Token for pool %v\n%v\n", chain, lpAddress, err.Error())
 					}
-					poolId, err := balancerV2WeightedPool.GetPoolId(callOpts)
+					poolId, err := balancerV2Wp2Token.GetPoolId(callOpts)
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
 					}
-					balancerV2TheVault, err := vaultContract.NewThevault(vaultAddress, client)
+					balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to create balancerV2TheVault for pool %v\n%s\n", chain, lpAddress, err.Error())
 					}
@@ -152,11 +152,11 @@ func getCreatedPool(ctx context.Context, param param) {
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool tokens for pool %v\n%v\n", chain, fmt.Sprintf("0x%x", poolId), err.Error())
 					}
-					weights, err := balancerV2WeightedPool.GetNormalizedWeights(callOpts)
+					weights, err := balancerV2Wp2Token.GetNormalizedWeights(callOpts)
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool %v weights\n", chain, lpAddress)
 					}
-					swapFeePerc, err := balancerV2WeightedPool.GetSwapFeePercentage(callOpts)
+					swapFeePerc, err := balancerV2Wp2Token.GetSwapFeePercentage(callOpts)
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool %v swap fee percentage\n", chain, lpAddress)
 					}
@@ -166,15 +166,17 @@ func getCreatedPool(ctx context.Context, param param) {
 					}
 					isPaused := paused.Paused
 					pools <- &poolData{
-						PoolId:       fmt.Sprintf("0x%x", poolId),
-						LpAddress:    lpAddress,
-						Chain:        chain,
-						Token0:       poolTokens.Tokens[0],
-						Token1:       poolTokens.Tokens[1],
-						WeightToken0: weights[0],
-						WeightToken1: weights[1],
-						SwapFeePerc:  swapFeePerc,
-						IsPaused:     isPaused,
+						PoolId:        fmt.Sprintf("0x%x", poolId),
+						LpAddress:     lpAddress,
+						Chain:         chain,
+						Token0:        poolTokens.Tokens[0],
+						Token1:        poolTokens.Tokens[1],
+						BalanceToken0: poolTokens.Balances[0],
+						BalanceToken1: poolTokens.Balances[1],
+						WeightToken0:  weights[0],
+						WeightToken1:  weights[1],
+						SwapFeePerc:   swapFeePerc,
+						IsPaused:      isPaused,
 					}
 				}
 			}(_log)
