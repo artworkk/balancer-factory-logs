@@ -165,7 +165,7 @@ func getCreatedPool(ctx context.Context, param param) {
 					}
 					header, err := client.HeaderByNumber(ctx, big.NewInt(int64(currentBlock)))
 					if err != nil {
-						log.Fatalf("[%s]\tfailed to get block header\n")
+						log.Fatalf("[%s]\tfailed to get block header\n", chain)
 					}
 					balToken0, _ := uint256.FromBig(poolTokens.Balances[0])
 					balToken1, _ := uint256.FromBig(poolTokens.Balances[1])
