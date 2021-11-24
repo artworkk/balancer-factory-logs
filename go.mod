@@ -2,7 +2,10 @@ module github.com/artworkk/balancer-factory-logs
 
 go 1.17
 
-require github.com/ethereum/go-ethereum v1.10.8
+require (
+	github.com/ethereum/go-ethereum v1.10.8
+	github.com/holiman/uint256 v1.2.0
+)
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect

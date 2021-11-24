@@ -12,12 +12,15 @@ import (
 
 	"github.com/artworkk/balancer-factory-logs/contract"
 	"github.com/artworkk/balancer-factory-logs/enums"
+	"github.com/artworkk/balancer-factory-logs/poolinterface"
+	libtypes "github.com/artworkk/balancer-factory-logs/types"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/holiman/uint256"
 )
 
 type param struct {
@@ -39,7 +42,7 @@ type poolData struct {
 }
 
 var (
-	pools = make(chan *poolData)
+	pools = make(chan *poolinterface.PoolBalancerV2)
 )
 
 func main() {
@@ -160,23 +163,29 @@ func getCreatedPool(ctx context.Context, param param) {
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool %v swap fee percentage\n", chain, lpAddress)
 					}
-					paused, err := balancerV2TheVault.GetPausedState(callOpts)
+					header, err := client.HeaderByNumber(ctx, big.NewInt(int64(currentBlock)))
 					if err != nil {
-						log.Fatalf("[%s]\tFailed to get the vault paused state", chain)
+						log.Fatalf("[%s]\tfailed to get block header\n")
 					}
-					isPaused := paused.Paused
-					pools <- &poolData{
-						PoolId:        fmt.Sprintf("0x%x", poolId),
-						LpAddress:     lpAddress,
-						Chain:         chain,
-						Token0:        poolTokens.Tokens[0],
-						Token1:        poolTokens.Tokens[1],
-						BalanceToken0: poolTokens.Balances[0],
-						BalanceToken1: poolTokens.Balances[1],
-						WeightToken0:  weights[0],
-						WeightToken1:  weights[1],
-						SwapFeePerc:   swapFeePerc,
-						IsPaused:      isPaused,
+					balToken0, _ := uint256.FromBig(poolTokens.Balances[0])
+					balToken1, _ := uint256.FromBig(poolTokens.Balances[1])
+					swapFeePercentage, _ := uint256.FromBig(swapFeePerc)
+					weightToken0, _ := uint256.FromBig(weights[0])
+					weightToken1, _ := uint256.FromBig(weights[1])
+
+					pools <- &poolinterface.PoolBalancerV2{
+						Chain:             chain,
+						LpAddress:         lpAddress,
+						Dex:               "BalancerV2Wp2Token",
+						Token0:            poolTokens.Tokens[0],
+						Token1:            poolTokens.Tokens[1],
+						BalanceToken0:     &libtypes.UInt256{Int: balToken0},
+						BalanceToken1:     &libtypes.UInt256{Int: balToken1},
+						SwapFeePercentage: &libtypes.UInt256{Int: swapFeePercentage},
+						NormalizedWeight0: &libtypes.UInt256{Int: weightToken0},
+						NormalizedWeight1: &libtypes.UInt256{Int: weightToken1},
+						UpdatedAt:         int64(header.Time),
+						UpdatedBlock:      uint64(currentBlock),
 					}
 				}
 			}(_log)
