@@ -83,7 +83,7 @@ func getCreatedPool(ctx context.Context, param param) {
 	currentBlock := int64(currentBlockUint)
 
 	// BalancerV2 WeightedPool2Tokens
-	wptokensFactoryAddress := enums.Wp2TokensFactoryAddr[chain]
+	wp2tokensFactoryAddress := enums.Wp2TokensFactoryAddr[chain]
 	wp2tokensFactory, err := abi.JSON(strings.NewReader(wp2tokens.BalancerV2Wp2TokensFactoryABI))
 	if err != nil {
 		log.Fatalf("[%s]\tfailed to parse BalancerV2Wp2TokensFactoryABI", chain)
@@ -100,6 +100,8 @@ func getCreatedPool(ctx context.Context, param param) {
 	fromBlock := enums.StablePoolGenesis[chain]
 	// fromBlock := enums.Wp2TokensGenesis[chain]
 
+	_, _, _, _ = wp2tokensPoolCreated, stablepoolPoolCreated, wp2tokensFactoryAddress, stablepoolFactoryAddress
+
 	var wg sync.WaitGroup
 	step := int64(1024)
 	guard := make(chan struct{}, step)
@@ -114,11 +116,11 @@ func getCreatedPool(ctx context.Context, param param) {
 			FromBlock: big.NewInt(from),
 			ToBlock:   big.NewInt(to),
 			Addresses: []common.Address{
-				// wptokensFactoryAddress,
+				wp2tokensFactoryAddress,
 				stablepoolFactoryAddress,
 			},
 			Topics: [][]common.Hash{{
-				// wp2tokensPoolCreated,
+				wp2tokensPoolCreated,
 				stablepoolPoolCreated,
 			}},
 		})
@@ -126,7 +128,7 @@ func getCreatedPool(ctx context.Context, param param) {
 			log.Fatalf("[%s]\tfailed to filter logs\n%s", chain, err.Error())
 		}
 		for _, _log := range logs {
-			if _log.Address != wptokensFactoryAddress {
+			if _log.Address != wp2tokensFactoryAddress {
 				continue
 			}
 			guard <- struct{}{}
@@ -137,92 +139,97 @@ func getCreatedPool(ctx context.Context, param param) {
 					wg.Done()
 				}()
 				switch l.Topics[0] {
-				case stablepoolPoolCreated:
-					lpAddress := common.HexToAddress(l.Topics[1].String())
-					log.Printf("[%s]\tFound PoolCreated on block %d at address %s\n",
-						chain, l.BlockNumber, lpAddress)
-					balancerv2stablepool, err := stablepool.NewBalancerV2StablePool(lpAddress, client)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to create balancerv2stablepool for pool %v\n%v\n", chain, lpAddress, err.Error())
-					}
-					callOpts := &bind.CallOpts{
-						BlockNumber: big.NewInt(currentBlock),
-						Context:     ctx,
-					}
-					poolId, err := balancerv2stablepool.GetPoolId(callOpts)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
-					}
-					vaultAddress, err := balancerv2stablepool.GetVault(callOpts)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
-					}
-					balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to create balancerV2TheVault for pool %v\n%s\n", chain, lpAddress, err.Error())
-					}
-					poolTokens, err := balancerV2TheVault.GetPoolTokens(callOpts, poolId)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to get pool tokens for pool %v\n%v\n", chain, fmt.Sprintf("0x%x", poolId), err.Error())
-					}
-					pools <- &poolData{
-						PoolId:    fmt.Sprintf("0x%x", poolId),
-						LpAddress: lpAddress,
-						Chain:     chain,
-						Token0:    poolTokens.Tokens[0],
-						Token1:    poolTokens.Tokens[1],
-					}
-				case wp2tokensPoolCreated:
-					lpAddress := common.HexToAddress(l.Topics[1].String())
-					log.Printf("[%s]\tFound PoolCreated on block %d at address %s\n",
-						chain, l.BlockNumber, lpAddress)
-					balancerv2wp2tokens, err := wp2tokens.NewBalancerV2Wp2Tokens(lpAddress, client)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to create balancerv2wp2tokens for pool %v\n%v\n", chain, lpAddress, err.Error())
-					}
-					callOpts := &bind.CallOpts{
-						BlockNumber: big.NewInt(currentBlock),
-						Context:     ctx,
-					}
-					poolId, err := balancerv2wp2tokens.GetPoolId(callOpts)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
-					}
-					vaultAddress, err := balancerv2wp2tokens.GetVault(callOpts)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
-					}
-					balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to create balancerV2TheVault for pool %v\n%s\n", chain, lpAddress, err.Error())
-					}
-					poolTokens, err := balancerV2TheVault.GetPoolTokens(callOpts, poolId)
-					if err != nil {
-						log.Fatalf("[%s]\tfailed to get pool tokens for pool %v\n%v\n", chain, fmt.Sprintf("0x%x", poolId), err.Error())
-					}
-					// weights, err := balancerv2wp2tokens.GetNormalizedWeights(callOpts)
-					// if err != nil {
-					// 	log.Fatalf("[%s]\tfailed to get pool %v weights\n", chain, lpAddress)
-					// }
-					// swapFeePerc, err := balancerv2wp2tokens.GetSwapFeePercentage(callOpts)
-					// if err != nil {
-					// 	log.Fatalf("[%s]\tfailed to get pool %v swap fee percentage\n", chain, lpAddress)
-					// }
-					// paused, err := balancerV2TheVault.GetPausedState(callOpts)
-					// if err != nil {
-					// 	log.Fatalf("[%s]\tFailed to get the vault paused state", chain)
-					// }
-					// isPaused := paused.Paused
-					pools <- &poolData{
-						PoolId:    fmt.Sprintf("0x%x", poolId),
-						LpAddress: lpAddress,
-						Chain:     chain,
-						Token0:    poolTokens.Tokens[0],
-						Token1:    poolTokens.Tokens[1],
-						// WeightToken0: weights[0],
-						// WeightToken1: weights[1],
-						// SwapFeePerc:  swapFeePerc,
-						// IsPaused:     isPaused,
+				case
+					wp2tokensPoolCreated,
+					stablepoolPoolCreated:
+					switch l.Address {
+					case stablepoolFactoryAddress:
+						lpAddress := common.HexToAddress(l.Topics[1].String())
+						log.Printf("[%s]\tFound StablePool PoolCreated on block %d at address %s\n",
+							chain, l.BlockNumber, lpAddress)
+						balancerv2stablepool, err := stablepool.NewBalancerV2StablePool(lpAddress, client)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to create balancerv2stablepool for pool %v\n%v\n", chain, lpAddress, err.Error())
+						}
+						callOpts := &bind.CallOpts{
+							BlockNumber: big.NewInt(currentBlock),
+							Context:     ctx,
+						}
+						poolId, err := balancerv2stablepool.GetPoolId(callOpts)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
+						}
+						vaultAddress, err := balancerv2stablepool.GetVault(callOpts)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
+						}
+						balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to create balancerV2TheVault for pool %v\n%s\n", chain, lpAddress, err.Error())
+						}
+						poolTokens, err := balancerV2TheVault.GetPoolTokens(callOpts, poolId)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to get pool tokens for pool %v\n%v\n", chain, fmt.Sprintf("0x%x", poolId), err.Error())
+						}
+						pools <- &poolData{
+							PoolId:    fmt.Sprintf("0x%x", poolId),
+							LpAddress: lpAddress,
+							Chain:     chain,
+							Token0:    poolTokens.Tokens[0],
+							Token1:    poolTokens.Tokens[1],
+						}
+					case wp2tokensFactoryAddress:
+						lpAddress := common.HexToAddress(l.Topics[1].String())
+						log.Printf("[%s]\tFound Wp2Tokens PoolCreated on block %d at address %s\n",
+							chain, l.BlockNumber, lpAddress)
+						balancerv2wp2tokens, err := wp2tokens.NewBalancerV2Wp2Tokens(lpAddress, client)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to create balancerv2wp2tokens for pool %v\n%v\n", chain, lpAddress, err.Error())
+						}
+						callOpts := &bind.CallOpts{
+							BlockNumber: big.NewInt(currentBlock),
+							Context:     ctx,
+						}
+						poolId, err := balancerv2wp2tokens.GetPoolId(callOpts)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
+						}
+						vaultAddress, err := balancerv2wp2tokens.GetVault(callOpts)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
+						}
+						balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to create balancerV2TheVault for pool %v\n%s\n", chain, lpAddress, err.Error())
+						}
+						poolTokens, err := balancerV2TheVault.GetPoolTokens(callOpts, poolId)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to get pool tokens for pool %v\n%v\n", chain, fmt.Sprintf("0x%x", poolId), err.Error())
+						}
+						// weights, err := balancerv2wp2tokens.GetNormalizedWeights(callOpts)
+						// if err != nil {
+						// 	log.Fatalf("[%s]\tfailed to get pool %v weights\n", chain, lpAddress)
+						// }
+						// swapFeePerc, err := balancerv2wp2tokens.GetSwapFeePercentage(callOpts)
+						// if err != nil {
+						// 	log.Fatalf("[%s]\tfailed to get pool %v swap fee percentage\n", chain, lpAddress)
+						// }
+						// paused, err := balancerV2TheVault.GetPausedState(callOpts)
+						// if err != nil {
+						// 	log.Fatalf("[%s]\tFailed to get the vault paused state", chain)
+						// }
+						// isPaused := paused.Paused
+						pools <- &poolData{
+							PoolId:    fmt.Sprintf("0x%x", poolId),
+							LpAddress: lpAddress,
+							Chain:     chain,
+							Token0:    poolTokens.Tokens[0],
+							Token1:    poolTokens.Tokens[1],
+							// WeightToken0: weights[0],
+							// WeightToken1: weights[1],
+							// SwapFeePerc:  swapFeePerc,
+							// IsPaused:     isPaused,
+						}
 					}
 				}
 			}(_log)
