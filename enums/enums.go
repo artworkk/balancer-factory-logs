@@ -25,8 +25,8 @@ const (
 )
 
 var (
-	Wp2tokensFactoryEthereum  common.Address = common.HexToAddress("0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9")
-	Wp2TokensFactoryPolygon   common.Address = common.HexToAddress("0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9")
+	Wp2tokensFactoryEthereum  common.Address = common.HexToAddress("0xA5bf2ddF098bb0Ef6d120C98217dD6B141c74EE0")
+	Wp2TokensFactoryPolygon   common.Address = common.HexToAddress("0xA5bf2ddF098bb0Ef6d120C98217dD6B141c74EE0")
 	StablePoolFactoryEthereum common.Address = common.HexToAddress("0xc66Ba2B6595D3613CCab350C886aCE23866EDe24")
 	StablePoolFactoryPolygon  common.Address = common.HexToAddress("0xc66Ba2B6595D3613CCab350C886aCE23866EDe24")
 )
