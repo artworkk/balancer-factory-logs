@@ -157,11 +157,11 @@ func getCreatedPool(ctx context.Context, param param) {
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
 					}
-					vaultCaller, err := contract.NewBalancerv2thevault(vaultAddress, client)
+					balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
 					if err != nil {
-						log.Fatalf("[%s]\tfailed to create vaultCaller for pool %v\n%s\n", chain, lpAddress, err.Error())
+						log.Fatalf("[%s]\tfailed to create balancerV2TheVault for pool %v\n%s\n", chain, lpAddress, err.Error())
 					}
-					poolTokens, err := vaultCaller.GetPoolTokens(callOpts, poolId)
+					poolTokens, err := balancerV2TheVault.GetPoolTokens(callOpts, poolId)
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool tokens for pool %v\n%v\n", chain, fmt.Sprintf("0x%x", poolId), err.Error())
 					}
@@ -192,11 +192,11 @@ func getCreatedPool(ctx context.Context, param param) {
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
 					}
-					vaultCaller, err := contract.NewBalancerv2thevault(vaultAddress, client)
+					balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
 					if err != nil {
-						log.Fatalf("[%s]\tfailed to create vaultCaller for pool %v\n%s\n", chain, lpAddress, err.Error())
+						log.Fatalf("[%s]\tfailed to create balancerV2TheVault for pool %v\n%s\n", chain, lpAddress, err.Error())
 					}
-					poolTokens, err := vaultCaller.GetPoolTokens(callOpts, poolId)
+					poolTokens, err := balancerV2TheVault.GetPoolTokens(callOpts, poolId)
 					if err != nil {
 						log.Fatalf("[%s]\tfailed to get pool tokens for pool %v\n%v\n", chain, fmt.Sprintf("0x%x", poolId), err.Error())
 					}
@@ -208,7 +208,7 @@ func getCreatedPool(ctx context.Context, param param) {
 					// if err != nil {
 					// 	log.Fatalf("[%s]\tfailed to get pool %v swap fee percentage\n", chain, lpAddress)
 					// }
-					// paused, err := vaultCaller.GetPausedState(callOpts)
+					// paused, err := balancerV2TheVault.GetPausedState(callOpts)
 					// if err != nil {
 					// 	log.Fatalf("[%s]\tFailed to get the vault paused state", chain)
 					// }
