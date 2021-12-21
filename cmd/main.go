@@ -45,6 +45,7 @@ func main() {
 	params := []param{
 		{chain: enums.Ethereum},
 		{chain: enums.Polygon},
+		{chain: enums.Arbitrum},
 	}
 	var wg sync.WaitGroup
 	for _, _param := range params {
