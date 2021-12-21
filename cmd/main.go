@@ -12,6 +12,7 @@ import (
 
 	contract "github.com/artworkk/balancer-factory-logs/contract"
 	stablepool "github.com/artworkk/balancer-factory-logs/contract/balancerv2_stablepool"
+	weightedpool "github.com/artworkk/balancer-factory-logs/contract/balancerv2_wp"
 	wp2tokens "github.com/artworkk/balancer-factory-logs/contract/balancerv2_wp2tokens"
 	"github.com/artworkk/balancer-factory-logs/enums"
 	"github.com/ethereum/go-ethereum"
@@ -88,22 +89,32 @@ func getCreatedPool(ctx context.Context, param param) {
 	if err != nil {
 		log.Fatalf("[%s]\tfailed to parse BalancerV2Wp2TokensFactoryABI", chain)
 	}
-	wp2tokensPoolCreated := wp2tokensFactory.Events["PoolCreated"].ID
 	// BalancerV2 StablePool
 	stablepoolFactoryAddress := enums.StablePoolFactoryAddr[chain]
 	stablepoolFactory, err := abi.JSON(strings.NewReader(stablepool.BalancerV2StablePoolFactoryABI))
 	if err != nil {
 		log.Fatalf("[%s]\tfailed to parse BalancerV2StablePoolFactoryABI", chain)
 	}
+	wpFactoryAddress := enums.WPFactoryAddr[chain]
+	wpFactory, err := abi.JSON(strings.NewReader(weightedpool.WpFactoryABI))
+	if err != nil {
+		log.Fatalf("[%s]\tfailed to parse BalancerV2WpFactoryABI", "kuy")
+	}
+	wp2tokensPoolCreated := wp2tokensFactory.Events["PoolCreated"].ID
 	stablepoolPoolCreated := stablepoolFactory.Events["PoolCreated"].ID
-	// TODO
+	wpPoolcreated := wpFactory.Events["PoolCreated"].ID
+
 	var fromBlock int64
 	wp2tokensGenesis := enums.Wp2TokensGenesis[chain]
 	stablepoolGenesis := enums.StablePoolGenesis[chain]
+	wpGenesis := enums.WPGenesis[chain]
 	if stablepoolGenesis < wp2tokensGenesis {
 		fromBlock = stablepoolGenesis
 	} else {
 		fromBlock = wp2tokensGenesis
+	}
+	if fromBlock > wpGenesis {
+		fromBlock = wpGenesis
 	}
 
 	var wg sync.WaitGroup
@@ -120,12 +131,14 @@ func getCreatedPool(ctx context.Context, param param) {
 			FromBlock: big.NewInt(from),
 			ToBlock:   big.NewInt(to),
 			Addresses: []common.Address{
-				wp2tokensFactoryAddress,
-				stablepoolFactoryAddress,
+				// wp2tokensFactoryAddress,
+				// stablepoolFactoryAddress,
+				wpFactoryAddress,
 			},
 			Topics: [][]common.Hash{{
-				wp2tokensPoolCreated,
-				stablepoolPoolCreated,
+				// wp2tokensPoolCreated,
+				// stablepoolPoolCreated,
+				wpPoolcreated,
 			}},
 		})
 		if err != nil {
@@ -135,7 +148,8 @@ func getCreatedPool(ctx context.Context, param param) {
 			switch _log.Address {
 			case
 				wp2tokensFactoryAddress,
-				stablepoolFactoryAddress:
+				stablepoolFactoryAddress,
+				wpFactoryAddress:
 			default:
 				continue
 			}
@@ -149,8 +163,44 @@ func getCreatedPool(ctx context.Context, param param) {
 				switch l.Topics[0] {
 				case
 					wp2tokensPoolCreated,
-					stablepoolPoolCreated:
+					stablepoolPoolCreated,
+					wpPoolcreated:
 					switch l.Address {
+					case wpFactoryAddress:
+						lpAddress := common.HexToAddress(l.Topics[1].String())
+						log.Printf("[%s]\tFound WeightedPool PoolCreated on block %d at address %s\n",
+							chain, l.BlockNumber, lpAddress)
+						balancerv2wp, err := weightedpool.NewWp(lpAddress, client)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to create balancerv2wp for pool %v\n%v\n", chain, lpAddress, err.Error())
+						}
+						callOpts := &bind.CallOpts{
+							BlockNumber: big.NewInt(currentBlock),
+							Context:     ctx,
+						}
+						poolId, err := balancerv2wp.GetPoolId(callOpts)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to get pool ID from LP address %v weights\n%v\n", chain, lpAddress, err.Error())
+						}
+						vaultAddress, err := balancerv2wp.GetVault(callOpts)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to get vault address: %v\n", chain, err.Error())
+						}
+						balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to create balancerV2TheVault: %v\n", chain, err.Error())
+						}
+						poolTokens, err := balancerV2TheVault.GetPoolTokens(callOpts, poolId)
+						if err != nil {
+							log.Fatalf("[%s]\tfailed to get pool tokens for pool %v\n%v\n", chain, fmt.Sprintf("0x%x", poolId), err.Error())
+						}
+						pools <- &poolData{
+							PoolId:    fmt.Sprintf("0x%x", poolId),
+							LpAddress: lpAddress,
+							Chain:     chain,
+							Token0:    poolTokens.Tokens[0],
+							Token1:    poolTokens.Tokens[1],
+						}
 					case stablepoolFactoryAddress:
 						lpAddress := common.HexToAddress(l.Topics[1].String())
 						log.Printf("[%s]\tFound StablePool PoolCreated on block %d at address %s\n",
@@ -173,7 +223,7 @@ func getCreatedPool(ctx context.Context, param param) {
 						}
 						balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
 						if err != nil {
-							log.Fatalf("[%s]\tfailed to create balancerV2TheVault for pool %v\n%s\n", chain, lpAddress, err.Error())
+							log.Fatalf("[%s]\tfailed to create balancerV2TheVault: %v\n", chain, err.Error())
 						}
 						poolTokens, err := balancerV2TheVault.GetPoolTokens(callOpts, poolId)
 						if err != nil {
@@ -208,7 +258,7 @@ func getCreatedPool(ctx context.Context, param param) {
 						}
 						balancerV2TheVault, err := contract.NewBalancerv2thevault(vaultAddress, client)
 						if err != nil {
-							log.Fatalf("[%s]\tfailed to create balancerV2TheVault for pool %v\n%s\n", chain, lpAddress, err.Error())
+							log.Fatalf("[%s]\tfailed to create balancerV2TheVault: %v\n", chain, err.Error())
 						}
 						poolTokens, err := balancerV2TheVault.GetPoolTokens(callOpts, poolId)
 						if err != nil {

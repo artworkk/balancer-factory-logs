@@ -22,6 +22,8 @@ const (
 	Wp2TokensFactoryGenesisPolygon   int64 = 15832998
 	StablePoolFactoryGenesisEthereum int64 = 12703127
 	StablePoolFactoryGenesisPolygon  int64 = 16138680
+	WPFactoryGenesisEthereum         int64 = 12272147
+	WPFactoryGenesisPolygon          int64 = 15832998
 )
 
 var (
@@ -29,6 +31,8 @@ var (
 	Wp2TokensFactoryPolygon   common.Address = common.HexToAddress("0xA5bf2ddF098bb0Ef6d120C98217dD6B141c74EE0")
 	StablePoolFactoryEthereum common.Address = common.HexToAddress("0xc66Ba2B6595D3613CCab350C886aCE23866EDe24")
 	StablePoolFactoryPolygon  common.Address = common.HexToAddress("0xc66Ba2B6595D3613CCab350C886aCE23866EDe24")
+	WPFactoryEthereum         common.Address = common.HexToAddress("0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9")
+	WPFactoryPolygon          common.Address = common.HexToAddress("0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9")
 )
 
 // Maps
@@ -45,6 +49,10 @@ var (
 		Ethereum: StablePoolFactoryEthereum,
 		Polygon:  StablePoolFactoryPolygon,
 	}
+	WPFactoryAddr = map[ChainType]common.Address{
+		Ethereum: WPFactoryEthereum,
+		Polygon:  WPFactoryPolygon,
+	}
 	Wp2TokensGenesis = map[ChainType]int64{
 		Ethereum: Wp2TokensFactoryGenesisEthereum,
 		Polygon:  Wp2TokensFactoryGenesisPolygon,
@@ -52,5 +60,8 @@ var (
 	StablePoolGenesis = map[ChainType]int64{
 		Ethereum: StablePoolFactoryGenesisEthereum,
 		Polygon:  StablePoolFactoryGenesisPolygon,
+	}
+	WPGenesis = map[ChainType]int64{
+		Ethereum: WPFactoryGenesisEthereum,
 	}
 )
