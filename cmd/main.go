@@ -30,15 +30,10 @@ type param struct {
 type poolData struct {
 	PoolId    string           `json:"poolId"`
 	LpAddress common.Address   `json:"lpAddress"`
+	DexType   enums.DexType    `json:"dexType"`
 	Chain     enums.ChainType  `json:"chain"`
 	Tokens    []common.Address `json:"tokens"`
 	Balances  []*big.Int       `json:"balances"`
-	// Token0    common.Address  `json:"token0"`
-	// Token1    common.Address  `json:"token1"`
-	// WeightToken0 *big.Int       `json:"weightToken0"`
-	// WeightToken1 *big.Int       `json:"weightToken1"`
-	// SwapFeePerc  *big.Int       `json:"swapFeePercentage"`
-	// IsPaused     bool           `json:"isPaused"`
 }
 
 var (
@@ -133,13 +128,13 @@ func getCreatedPool(ctx context.Context, param param) {
 			FromBlock: big.NewInt(from),
 			ToBlock:   big.NewInt(to),
 			Addresses: []common.Address{
-				// wp2tokensFactoryAddress,
-				// stablepoolFactoryAddress,
+				wp2tokensFactoryAddress,
+				stablepoolFactoryAddress,
 				wpFactoryAddress,
 			},
 			Topics: [][]common.Hash{{
-				// wp2tokensPoolCreated,
-				// stablepoolPoolCreated,
+				wp2tokensPoolCreated,
+				stablepoolPoolCreated,
 				wpPoolcreated,
 			}},
 		})
@@ -149,6 +144,7 @@ func getCreatedPool(ctx context.Context, param param) {
 		for _, _log := range logs {
 			var lpAddress, vaultAddress common.Address
 			var poolId [32]byte
+			var dexType enums.DexType
 			callOpts := &bind.CallOpts{
 				BlockNumber: big.NewInt(currentBlock),
 				Context:     ctx,
@@ -175,6 +171,7 @@ func getCreatedPool(ctx context.Context, param param) {
 					wpPoolcreated:
 					switch l.Address {
 					case wpFactoryAddress:
+						dexType = enums.Wp
 						lpAddress = common.HexToAddress(l.Topics[1].String())
 						log.Printf("[%s]\tFound WeightedPool PoolCreated on block %d at address %s\n",
 							chain, l.BlockNumber, lpAddress)
@@ -191,6 +188,7 @@ func getCreatedPool(ctx context.Context, param param) {
 							log.Fatalf("[%s]\tfailed to get vault address: %v\n", chain, err.Error())
 						}
 					case stablepoolFactoryAddress:
+						dexType = enums.StablePool
 						lpAddress := common.HexToAddress(l.Topics[1].String())
 						log.Printf("[%s]\tFound StablePool PoolCreated on block %d at address %s\n",
 							chain, l.BlockNumber, lpAddress)
@@ -207,6 +205,7 @@ func getCreatedPool(ctx context.Context, param param) {
 							log.Fatalf("[%s]\tfailed to get vault address: %v\n", chain, err.Error())
 						}
 					case wp2tokensFactoryAddress:
+						dexType = enums.Wp2Tokens
 						lpAddress := common.HexToAddress(l.Topics[1].String())
 						log.Printf("[%s]\tFound Wp2Tokens PoolCreated on block %d at address %s\n",
 							chain, l.BlockNumber, lpAddress)
@@ -235,6 +234,7 @@ func getCreatedPool(ctx context.Context, param param) {
 				pools <- &poolData{
 					PoolId:    fmt.Sprintf("0x%x", poolId),
 					LpAddress: lpAddress,
+					DexType:   dexType,
 					Chain:     chain,
 					Tokens:    poolTokens.Tokens,
 					Balances:  poolTokens.Balances,
